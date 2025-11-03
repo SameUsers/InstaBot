@@ -10,23 +10,31 @@ from source.utils.datetime_utils import to_naive_utc, utcnow
 
 class PostRepository:
     @classmethod
+    async def _get_post_by_ids_in_session(cls, session, user_id: UUID, post_id: UUID) -> Post | None:
+        result = await session.execute(
+            select(Post).where(Post.user_id == user_id, Post.post_id == post_id)
+        )
+        return result.scalar_one_or_none()
+
+    @classmethod
     async def _get_post_by_ids(cls, user_id: UUID, post_id: UUID) -> Post | None:
         async with get_async_session() as session:
-            result = await session.execute(
-                select(Post).where(Post.user_id == user_id, Post.post_id == post_id)
+            return await cls._get_post_by_ids_in_session(session, user_id, post_id)
+
+    @classmethod
+    async def _get_post_by_creation_id_in_session(cls, session, user_id: UUID, creation_id: str) -> Post | None:
+        result = await session.execute(
+            select(Post).where(
+                Post.user_id == user_id,
+                Post.instagram_creation_id == creation_id,
             )
-            return result.scalar_one_or_none()
+        )
+        return result.scalar_one_or_none()
 
     @classmethod
     async def _get_post_by_creation_id(cls, user_id: UUID, creation_id: str) -> Post | None:
         async with get_async_session() as session:
-            result = await session.execute(
-                select(Post).where(
-                    Post.user_id == user_id,
-                    Post.instagram_creation_id == creation_id,
-                )
-            )
-            return result.scalar_one_or_none()
+            return await cls._get_post_by_creation_id_in_session(session, user_id, creation_id)
 
     @classmethod
     async def create_post(
@@ -55,7 +63,7 @@ class PostRepository:
         logger.info("Marking post as published user_id={user_id} creation_id={creation_id}", 
                    user_id=str(user_id), creation_id=instagram_creation_id)
         async with get_async_session() as session:
-            post = await cls._get_post_by_creation_id(user_id, instagram_creation_id)
+            post = await cls._get_post_by_creation_id_in_session(session, user_id, instagram_creation_id)
             if not post:
                 raise PostNotFoundError("Post not found")
             post.published_at = utcnow()
@@ -78,7 +86,7 @@ class PostRepository:
     @classmethod
     async def delete_post(cls, *, user_id: UUID, post_id: UUID) -> None:
         async with get_async_session() as session:
-            post = await cls._get_post_by_ids(user_id, post_id)
+            post = await cls._get_post_by_ids_in_session(session, user_id, post_id)
             if not post:
                 raise PostNotFoundError("Post not found")
             await session.delete(post)
@@ -106,7 +114,7 @@ class PostRepository:
         logger.info("Updating time_to_publish for post_id={post_id}, user_id={user_id}", 
                    post_id=str(post_id), user_id=str(user_id))
         async with get_async_session() as session:
-            post = await cls._get_post_by_ids(user_id, post_id)
+            post = await cls._get_post_by_ids_in_session(session, user_id, post_id)
             if not post:
                 raise PostNotFoundError("Post not found")
             post.time_to_publish = to_naive_utc(time_to_publish)

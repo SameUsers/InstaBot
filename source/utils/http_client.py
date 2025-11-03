@@ -33,11 +33,21 @@ class HttpClient:
                     headers=merged_headers,
                     timeout=timeout
                 )
+                if response.status_code >= 400:
+                    request_body = json_data or data
+                    logger.error(
+                        "HTTP POST request failed: url={url}, status={status}, request_body={req_body}, response_body={body}",
+                        url=url,
+                        status=response.status_code,
+                        req_body=str(request_body)[:500] if request_body else None,
+                        body=response.text[:500]
+                    )
                 response.raise_for_status()
                 return response
         except httpx.HTTPError as exc:
-            logger.exception("HTTP POST request failed: url={url}, error={error}", 
-                           url=url, error=str(exc))
+            request_body = json_data or data
+            logger.exception("HTTP POST request failed: url={url}, error={error}, request_body={req_body}", 
+                           url=url, error=str(exc), req_body=str(request_body)[:500] if request_body else None)
             raise
 
     async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None,
@@ -53,6 +63,13 @@ class HttpClient:
                     headers=merged_headers,
                     timeout=timeout
                 )
+                if response.status_code >= 400:
+                    logger.error(
+                        "HTTP GET request failed: url={url}, status={status}, response_body={body}",
+                        url=url,
+                        status=response.status_code,
+                        body=response.text[:500]
+                    )
                 response.raise_for_status()
                 return response
         except httpx.HTTPError as exc:

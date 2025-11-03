@@ -36,7 +36,7 @@ fi
 echo ""
 echo "Step 3: Running unit tests..."
 cd /app || exit 1
-if pytest -c config/pytest.ini source/tests/unit/ -v --tb=short; then
+if pytest source/tests/unit/ -v --tb=short; then
     echo "✓ Unit tests passed!"
 else
     echo "✗ Unit tests failed!"
@@ -44,19 +44,29 @@ else
 fi
 
 echo ""
-echo "Step 4: Running integration tests..."
-if pytest -c config/pytest.ini source/tests/integration/ -v --tb=short 2>/dev/null; then
-    echo "✓ Integration tests passed!"
-else
-    echo "⚠ Integration tests skipped or failed (expected if no tests yet)"
-fi
-
-echo ""
-echo "Step 5: Running API tests..."
-if pytest -c config/pytest.ini source/tests/api/ -v --tb=short; then
+echo "Step 4: Running API tests..."
+if pytest source/tests/api/ -v --tb=short; then
     echo "✓ API tests passed!"
 else
     echo "✗ API tests failed!"
+    exit 1
+fi
+
+echo ""
+echo "Step 5: Running integration tests..."
+if pytest source/tests/integration/ -v --tb=short; then
+    echo "✓ Integration tests passed!"
+else
+    echo "✗ Integration tests failed!"
+    exit 1
+fi
+
+echo ""
+echo "Step 6: Running E2E tests..."
+if pytest source/tests/e2e/ -v --tb=short; then
+    echo "✓ E2E tests passed!"
+else
+    echo "✗ E2E tests failed!"
     exit 1
 fi
 

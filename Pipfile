@@ -22,6 +22,7 @@ loguru = "*"
 minio = "*"
 
 [dev-packages]
+pytest-cov = "*"
 
 [requires]
 python_version = "3.12"

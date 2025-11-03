@@ -76,6 +76,10 @@ async def _process_messaging_item(messaging: MessagingItem, page_id: int | None)
     user_id = await _resolve_user_id(page_id)
     logger.info("Resolved user_id by instagram_id: {user_id}", user_id=str(user_id) if user_id else None)
     
+    if not user_id:
+        logger.warning("No user_id found for page_id={page_id}, skipping message processing", page_id=page_id)
+        return
+    
     context_text = await _get_wikibase_context(user_id)
     logger.info("Context length: {length}", length=len(context_text) if context_text else 0)
     
@@ -117,12 +121,23 @@ async def get_event(request: Request) -> None:
         logger.exception("Webhook payload validation failed: {error}", error=str(exc))
         return
     
+    # Собираем задачи для параллельной обработки сообщений
+    tasks = []
+    
     for entry in payload.entry:
-        for messaging in entry.messaging:
-            if messaging.message:
-                page_id = await _parse_page_id(messaging.recipient.id)
-                logger.info("Parsed page_id: {page_id}", page_id=page_id)
-                await _process_messaging_item(messaging, page_id)
+        if entry.messaging:
+            for messaging in entry.messaging:
+                if messaging.message:
+                    page_id = await _parse_page_id(messaging.recipient.id)
+                    logger.info("Parsed page_id: {page_id}", page_id=page_id)
+                    # Создаём задачу для параллельного выполнения
+                    tasks.append(_process_messaging_item(messaging, page_id))
+        elif entry.changes:
+            logger.info("Received changes event: field={field}", field=entry.changes[0].get("field") if entry.changes else "unknown")
+    
+    # Параллельно обрабатываем все сообщения
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 async def _generate_post_content(user_id: str, caption: str, images: list[str]) -> dict:
     result = await openrouter.create_post_for_user(user_id, caption, images)
@@ -225,8 +240,8 @@ async def publish_post(
     if not credentials:
         raise HTTPException(status_code=404, detail="Instagram credentials not found")
     try:
-        post = await post_repository.get_post(user_id=current_user.user_id, post_id=data.post_id)
-    except PostNotFoundError:
+        post = await post_repository.get_post(user_id=current_user.user_id, post_id=UUID(data.post_id))
+    except (PostNotFoundError, ValueError):
         raise HTTPException(status_code=404, detail="Post not found")
     await Publisher.publish_media(
         inst_id=credentials.instagram_id,

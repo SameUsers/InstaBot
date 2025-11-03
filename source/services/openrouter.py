@@ -66,8 +66,13 @@ class Openrouter:
         try:
             from source.repositories.post_context import post_context_repository
             ctx = await post_context_repository.get_context(UUID(user_id))
-            return ctx.content if ctx else fallback
-        except Exception:
+            context_to_use = ctx.content if ctx else fallback
+            logger.debug("Retrieved user context: user_id={user_id}, has_context={has_ctx}", 
+                        user_id=user_id, has_ctx=bool(ctx))
+            return context_to_use
+        except Exception as exc:
+            logger.warning("Failed to get user context, using fallback: user_id={user_id}, error={error}", 
+                          user_id=user_id, error=str(exc))
             return fallback
 
     async def generate_response_for_user(self, user_id: str, user_query: str, *, fallback_context: str = "") -> str:
@@ -112,6 +117,13 @@ class Openrouter:
         content = cls._build_post_content(prompt, images)
         messages = cls._build_post_messages(content, system_ctx)
 
+        logger.info(
+            "Creating post with OpenRouter: model={model}, images_count={img_count}, has_system_ctx={has_ctx}",
+            model=settings.openrouter_image_model_key,
+            img_count=len(images),
+            has_ctx=bool(system_ctx)
+        )
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.openrouter_base_url,
@@ -127,6 +139,11 @@ class Openrouter:
             )
             
             if response.status_code != 200:
+                logger.error(
+                    "OpenRouter API error: status={status}, response={response}",
+                    status=response.status_code,
+                    response=response.text[:200]
+                )
                 return {
                     ResponseKeys.error: f"API error: {response.status_code}",
                     ResponseKeys.details: response.text
@@ -138,15 +155,22 @@ class Openrouter:
             
             try:
                 data_url = cls._extract_image_url(data)
-            except Exception:
+            except Exception as exc:
+                logger.exception("Failed to extract image from OpenRouter response: {error}", error=str(exc))
                 return {ResponseKeys.error: "Model did not return image data"}
             
             try:
                 base64_string = cls._extract_base64_from_data_url(data_url)
-            except Exception:
+            except Exception as exc:
+                logger.exception("Failed to decode base64 from data URL: {error}", error=str(exc))
                 return {ResponseKeys.error: "Invalid image data URL returned by model"}
             
             image_url = await minio_client.upload_from_base64(base64_string)
+            logger.info(
+                "Post created successfully: text_len={len}, image_url={url}",
+                len=len(text_content),
+                url=image_url
+            )
             return {
                 ResponseKeys.text: text_content,
                 ResponseKeys.image_url: image_url
@@ -158,7 +182,9 @@ class Openrouter:
             from source.repositories.post_context import post_context_repository
             ctx = await post_context_repository.get_context(UUID(user_id))
             system_ctx = ctx.content if (ctx and ctx.content) else None
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to get post context for user, proceeding without context: user_id={user_id}, error={error}", 
+                          user_id=user_id, error=str(exc))
             system_ctx = None
         return await cls.create_post(prompt, images, system_ctx=system_ctx)
 

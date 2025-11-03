@@ -33,7 +33,8 @@ class MessagingItem(BaseModel):
 class Entry(BaseModel):
     time: int
     id: str
-    messaging: list[MessagingItem]
+    messaging: list[MessagingItem] | None = None
+    changes: list[dict] | None = None
 
 class InstagramWebhookPayload(BaseModel):
     object: str

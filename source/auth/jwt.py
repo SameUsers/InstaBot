@@ -2,6 +2,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from typing import Any, Dict
+from loguru import logger
 
 from source.conf import settings
 from source.schemas.auth import RegistrationSchemaResponse, RefreshResponseSchema
@@ -42,8 +43,11 @@ class TokenService:
         permissions: str,
         refresh_token_version: int
     ) -> RegistrationSchemaResponse:
+        logger.info("Generating tokens for user: user_id={user_id}, email={email}", 
+                   user_id=str(user_id), email=email)
         access_token = cls._generate_access_token(user_id, email, username, permissions)
         refresh_token = cls._generate_refresh_token(user_id, refresh_token_version)
+        logger.info("Tokens generated successfully for user: user_id={user_id}", user_id=str(user_id))
         return RegistrationSchemaResponse(
             access_token=access_token,
             refresh_token=refresh_token
@@ -67,8 +71,10 @@ class TokenService:
             )
             return payload
         except jwt.ExpiredSignatureError:
+            logger.warning("Refresh token expired")
             raise TokenServiceError("Refresh token expired")
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as exc:
+            logger.warning("Invalid refresh token: {error}", error=str(exc))
             raise TokenServiceError("Invalid refresh token")
 
     @staticmethod
@@ -76,12 +82,18 @@ class TokenService:
         user_id = payload.get(RefreshTokenRows.sub)
         token_version = payload.get(RefreshTokenRows.token_version)
         if not user_id or token_version is None:
+            logger.warning("Refresh token payload missing required fields")
             raise TokenServiceError("Payload missing fields")
         return user_id, token_version
 
     @staticmethod
     def _validate_token_version(token_version: int, db_token_version: int) -> None:
         if token_version != db_token_version:
+            logger.warning(
+                "Token version mismatch: token_version={token_ver}, db_version={db_ver}",
+                token_ver=token_version,
+                db_ver=db_token_version
+            )
             raise InvalidTokenVersionError("Refresh token is expired or invalid")
 
     @classmethod
@@ -90,6 +102,7 @@ class TokenService:
         refresh_token: str,
         increment_token_version: bool = True
     ) -> RefreshResponseSchema:
+        logger.info("Refreshing tokens: increment_version={increment}", increment=increment_token_version)
         payload = cls._decode_refresh_token(refresh_token)
         user_id_str, token_version = cls._extract_token_data(payload)
         user_id = UUID(user_id_str)
@@ -111,6 +124,7 @@ class TokenService:
             new_token_version += 1
         
         updated_refresh_token = cls._generate_refresh_token(user_id, new_token_version)
+        logger.info("Tokens refreshed successfully: user_id={user_id}", user_id=str(user_id))
         return RefreshResponseSchema(
             access_token=access_token,
             refresh_token=updated_refresh_token

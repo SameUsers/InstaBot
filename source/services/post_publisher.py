@@ -1,3 +1,4 @@
+import asyncio
 from loguru import logger
 
 from source.models.post import Post
@@ -49,16 +50,23 @@ class PostPublishService:
             
             logger.info("Found {count} posts to publish", count=len(posts))
             
-            for post in posts:
-                try:
-                    await cls._publish_single_post(post)
-                except Exception as exc:
-                    logger.exception(
-                        "Failed to publish post post_id={post_id}, user_id={user_id}: {error}",
-                        post_id=str(post.post_id),
-                        user_id=str(post.user_id),
-                        error=str(exc)
-                    )
+            # Ограничение конкурентности: максимум 5 параллельных публикаций
+            semaphore = asyncio.Semaphore(5)
+            
+            async def _publish_with_semaphore(post: Post) -> None:
+                async with semaphore:
+                    try:
+                        await cls._publish_single_post(post)
+                    except Exception as exc:
+                        logger.exception(
+                            "Failed to publish post post_id={post_id}, user_id={user_id}: {error}",
+                            post_id=str(post.post_id),
+                            user_id=str(post.user_id),
+                            error=str(exc)
+                        )
+            
+            # Параллельно обрабатываем все посты с ограничением конкурентности
+            await asyncio.gather(*[_publish_with_semaphore(post) for post in posts], return_exceptions=True)
         except Exception as exc:
             logger.exception("Error in publish_pending_posts: {error}", error=str(exc))
 

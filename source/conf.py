@@ -87,7 +87,7 @@ class Config(BaseSettings):
 
     # Instagram Webhook Configuration
     verify_token: str = Field(
-        default="",
+        default="strstrstr",
         description="Token for Instagram webhook verification"
     )
 

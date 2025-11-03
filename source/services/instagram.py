@@ -66,7 +66,8 @@ class Publisher:
         container_body = cls._build_container_body(image_url, caption)
         url = f"{BASE_IG_URL}/{inst_id}/media"
 
-        logger.info("Creating IG media container: inst_id={inst_id} image_url={image_url}", inst_id=inst_id, image_url=image_url)
+        logger.info("Creating IG media container: inst_id={inst_id} image_url={image_url} caption_preview={caption_preview}", 
+                   inst_id=inst_id, image_url=image_url, caption_preview=(caption[:100] + "...") if len(caption) > 100 else caption)
         
         client = HttpClient()
         response = await client.post(url, data=json.dumps(container_body), headers=headers, timeout=60)

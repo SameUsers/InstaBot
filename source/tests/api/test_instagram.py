@@ -37,10 +37,18 @@ def cleanup_extra_instagram_users():
     engine = create_engine(DB_URL)
     with engine.begin() as conn:
         emails = ["igbadpayload@example.com"]
+        for email in emails:
+            user_ids = [row[0] for row in conn.execute(select(User.user_id).where(User.email == email))]
+            for uid in user_ids:
+                conn.execute(delete(InstagramCredentials).where(InstagramCredentials.user_id == uid))
         conn.execute(delete(User).where(User.email.in_(emails)))
     yield
     with engine.begin() as conn:
         emails = ["igbadpayload@example.com"]
+        for email in emails:
+            user_ids = [row[0] for row in conn.execute(select(User.user_id).where(User.email == email))]
+            for uid in user_ids:
+                conn.execute(delete(InstagramCredentials).where(InstagramCredentials.user_id == uid))
         conn.execute(delete(User).where(User.email.in_(emails)))
     engine.dispose()
 
@@ -142,5 +150,94 @@ def test_instagram_register_invalid_payload():
         bad_data = {"instagram_id": 1234567, "instagram_token": "short"}
         resp = client.post(INSTAGRAM_URL, json=bad_data, headers=headers)
         assert resp.status_code == 422
+
+
+def test_instagram_register_negative_id():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        bad_data = {"instagram_id": -1, "instagram_token": "IGQVJvalid_token_here_string"}
+        resp = client.post(INSTAGRAM_URL, json=bad_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_instagram_register_zero_id():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        bad_data = {"instagram_id": 0, "instagram_token": "IGQVJvalid_token_string_here"}
+        resp = client.post(INSTAGRAM_URL, json=bad_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_instagram_register_long_token():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        bad_data = {"instagram_id": 1234567, "instagram_token": "A" * 257}
+        resp = client.post(INSTAGRAM_URL, json=bad_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_instagram_register_empty_fields():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        resp = client.post(INSTAGRAM_URL, json={}, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_instagram_register_missing_fields():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        bad_data = {"instagram_token": "IGQVJvalid_token_string_here"}
+        resp = client.post(INSTAGRAM_URL, json=bad_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_instagram_update_without_credentials():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        upd_data = {"instagram_id": 999, "instagram_token": "IGQVJupdate_token_string"}
+        resp = client.put(INSTAGRAM_CREDS_URL, json=upd_data, headers=headers)
+        assert resp.status_code == 404
+
+
+def test_instagram_delete_without_credentials():
+    with TestClient(app) as client:
+        email = "igbadpayload@example.com"
+        username = "igbad"
+        password = "Passw0rd!ig"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+        
+        resp = client.delete(INSTAGRAM_CREDS_URL, headers=headers)
+        assert resp.status_code == 404
 
         

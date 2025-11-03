@@ -84,3 +84,133 @@ def test_wikibase_full_flow_create_get_update_delete():
         assert resp_get_missing2.status_code == 404
 
 
+def test_wikibase_create_empty_content():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_data = {"content": ""}
+        resp = client.post(WIKIBASE_URL, json=ctx_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_create_long_content():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_data = {"content": "A" * 16001}
+        resp = client.post(WIKIBASE_URL, json=ctx_data, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_create_missing_field():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        resp = client.post(WIKIBASE_URL, json={}, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_update_empty_content():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_initial = {"content": "initial context"}
+        resp_create = client.post(WIKIBASE_URL, json=ctx_initial, headers=headers)
+        assert resp_create.status_code in (200, 201)
+
+        ctx_empty = {"content": ""}
+        resp = client.put(WIKIBASE_URL, json=ctx_empty, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_update_long_content():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_initial = {"content": "initial context"}
+        resp_create = client.post(WIKIBASE_URL, json=ctx_initial, headers=headers)
+        assert resp_create.status_code in (200, 201)
+
+        ctx_long = {"content": "A" * 16001}
+        resp = client.put(WIKIBASE_URL, json=ctx_long, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_update_missing_field():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_initial = {"content": "initial context"}
+        resp_create = client.post(WIKIBASE_URL, json=ctx_initial, headers=headers)
+        assert resp_create.status_code in (200, 201)
+
+        resp = client.put(WIKIBASE_URL, json={}, headers=headers)
+        assert resp.status_code == 422
+
+
+def test_wikibase_without_auth():
+    with TestClient(app) as client:
+        ctx_data = {"content": "unauthorized context"}
+        resp = client.post(WIKIBASE_URL, json=ctx_data)
+        assert resp.status_code == 401
+
+
+def test_wikibase_get_without_auth():
+    with TestClient(app) as client:
+        resp = client.get(WIKIBASE_URL)
+        assert resp.status_code == 401
+
+
+def test_wikibase_update_without_auth():
+    with TestClient(app) as client:
+        ctx_data = {"content": "unauthorized update"}
+        resp = client.put(WIKIBASE_URL, json=ctx_data)
+        assert resp.status_code == 401
+
+
+def test_wikibase_delete_without_auth():
+    with TestClient(app) as client:
+        resp = client.delete(WIKIBASE_URL)
+        assert resp.status_code == 401
+
+
+def test_wikibase_content_strip_whitespace():
+    with TestClient(app) as client:
+        email = "wikibaseuser@example.com"
+        username = "wbuser"
+        password = "Passw0rd!wb"
+        login_json = create_and_login(client, email, username, password)
+        headers = {"Authorization": f"Bearer {login_json['access_token']}"}
+
+        ctx_with_whitespace = {"content": "  context with spaces  "}
+        resp = client.post(WIKIBASE_URL, json=ctx_with_whitespace, headers=headers)
+        assert resp.status_code in (200, 201)
+
+        resp_get = client.get(WIKIBASE_URL, headers=headers)
+        assert resp_get.status_code == 200
+        assert resp_get.json()["content"] == "context with spaces"
+

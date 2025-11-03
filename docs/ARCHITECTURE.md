@@ -301,10 +301,17 @@ User (1) ────< (1) Wikibase
 
 ### Performance Optimizations
 
-- Async I/O throughout (FastAPI + SQLAlchemy)
-- Connection pooling for database
+- **Async I/O throughout**: FastAPI + SQLAlchemy async sessions
+- **Non-blocking operations**: All I/O operations (MinIO, HTTP, DB) are async
+- **Parallel processing**: Webhook messages and post publishing use concurrent execution
+- **Thread pool for CPU-intensive tasks**: Bcrypt operations run in thread pool
+- **Connection pooling**: Efficient database and HTTP connection management
+- **Concurrency control**: Semaphores prevent resource exhaustion
+- **Lazy initialization**: Resources initialized on-demand
 - Caching layer (future Redis integration)
 - Efficient database queries (indexes, pagination)
+
+See [Async Optimization Documentation](ASYNC_OPTIMIZATION.md) for detailed information.
 
 ### Deployment Patterns
 
@@ -363,14 +370,34 @@ Current coverage spans:
 - Dependency checks (DB, MinIO, external APIs)
 - Graceful degradation
 
+## Async Operations
+
+InstaBot is fully optimized for asynchronous operations:
+
+- ✅ All database operations use async SQLAlchemy sessions
+- ✅ All HTTP requests use async clients (httpx)
+- ✅ All file operations (MinIO) are non-blocking
+- ✅ CPU-intensive tasks (bcrypt) run in thread pool
+- ✅ Parallel processing for webhooks and post publishing
+- ✅ Concurrency control with Semaphores
+
+**Performance Benefits**:
+- High throughput under concurrent load
+- Non-blocking I/O operations
+- Efficient resource utilization
+- Scalable architecture
+
+See [Async Optimization Documentation](ASYNC_OPTIMIZATION.md) for implementation details.
+
 ## Future Enhancements
 
 ### Planned Improvements
 
-- [ ] Caching layer (Redis)
-- [ ] Message queue (Celery/RabbitMQ)
-- [ ] API rate limiting
+- [ ] Caching layer (Redis with aioredis)
+- [ ] Message queue (Celery/RabbitMQ or async alternative)
+- [ ] API rate limiting (async-aware)
 - [ ] WebSocket support for real-time updates
+- [ ] Streaming responses for large datasets
 - [ ] Analytics and reporting
 - [ ] Multi-tenant support
 - [ ] Advanced scheduling options
