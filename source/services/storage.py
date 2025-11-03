@@ -28,8 +28,7 @@ class MinioClient:
         """Ленивая инициализация bucket: проверка и создание при первом использовании."""
         if self._bucket_initialized:
             return
-        
-        # Ленивое создание lock при первом использовании
+            
         if self._init_lock is None:
             self._init_lock = asyncio.Lock()
         

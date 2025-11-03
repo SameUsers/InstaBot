@@ -47,6 +47,7 @@ services:
         sleep 5
         mc alias set myminio http://localhost:9000 ${MINIO_USER:-admin} ${MINIO_PASSWORD:-password123} || true
         mc mb myminio/${MINIO_BUCKET:-images} || true
+        mc anonymous set public myminio/${MINIO_BUCKET:-images} || true
         wait
       "
 
